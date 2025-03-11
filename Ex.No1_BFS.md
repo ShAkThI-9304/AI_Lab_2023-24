@@ -44,7 +44,7 @@ print("Following is the Breadth-First Search:")
 bfs(visited, graph, '5')
 ### Output:
 
-![Screenshot (10)](https://github.com/santhakumar-M/AI_Lab_2023-24/assets/121998012/6f13b3b8-096e-4a11-a66d-9cc961329854)
+![image](https://github.com/user-attachments/assets/84961211-971f-47bf-a6b2-83b14ea631a9)
 
 
 ### Result:
