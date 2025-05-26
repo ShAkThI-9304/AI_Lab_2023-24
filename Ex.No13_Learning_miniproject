@@ -1,131 +1,109 @@
-# Ex.No: 13   Machine Learning – MiniProject
-### DATE:05/06/25                                                                       
+# Ex.No: 10 - User Identification Using Walking Activity with ResNet
+### DATE: 13-05-2025                                                                           
 ### REGISTER NUMBER : 212222040141
 ### AIM: 
-To write a program to train the classifier for Wine Quality Prediction.
+To write a program to train the classifier for user identification using walking activity data collected from smartphone accelerometers.
+
 ###  Algorithm:
-Step 1: Start the program.
+```
+1.Load and extract accelerometer data from all participants CSV files.
+2.Segment the data using a sliding window to create fixed-length sequences.
+3.Label each sequence based on the participant ID.
+4.Split the dataset into training and test sets after one-hot encoding labels.
+5.Build a 1D ResNet model with residual blocks for time-series classification.
+6.Train the model on the training data using categorical cross-entropy loss.
+7.Evaluate the model on test data and predict sample labels.
+```
 
-Step 2: Import necessary libraries:
-
-pandas for data handling.
-sklearn for model creation and dataset splitting.
-pickle for model persistence.
-
-Step 3: Load the wine quality dataset from a CSV file.
-
-Step 4: Define the features and target variable:
-
-Set X as the dataset features (excluding "quality" and any unique identifiers).
-Set y as the target variable, which is "quality".
-
-Step 5: Split the dataset into training and testing sets to evaluate model performance.
-
-Step 6: Train a RandomForestClassifier on the training data using X_train and y_train.
-
-Step 7: Save the trained model as a .pkl file using pickle for future use.
-
-Step 8: Create a Streamlit web app:
-
-Load the saved model file.
-Define input fields for each wine feature using st.number_input for user input.
-
-Step 9: Capture user inputs for all wine quality features:
-
-For each feature (e.g., "Fixed acidity," "Volatile acidity"), take user inputs within appropriate ranges.
-
-Step 10: Define a prediction button:
-
-When pressed, prepare user data in the required format.
-Use the loaded model to predict wine quality based on the input features.
-
-Step 11: Display the predicted wine quality to the user:
-
-If successful, show the result.
-If an error occurs, display an appropriate error message.
-
-Step 12: Stop the program.
 ### Program:
 ```
+# STEP 1: Unzip the Dataset
+import zipfile, os
+zip_path = "/content/user+identification+from+walking+activity.zip"
+extract_path = "/content/data"
+with zipfile.ZipFile(zip_path, 'r') as zip_ref:
+    zip_ref.extractall(extract_path)
+
+# STEP 2: Preprocess the Data
+import glob
+import numpy as np
 import pandas as pd
-from sklearn.ensemble import RandomForestClassifier  # or any other model
-from sklearn.model_selection import train_test_split
-import pickle
 
-# Load your dataset
-data = pd.read_csv('WineQT.csv')  # Update with your dataset path
+all_files = glob.glob("/content/data/User Identification From Walking Activity/*.csv")
+data, labels = [], []
+window_size, stride = 100, 50
 
-# Define features and target
-X = data.drop(columns=['quality', 'Id'])  # Features
-y = data['quality']  # Target variable
-
-# Split the dataset (optional)
-X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
-
-# Train the model
-model = RandomForestClassifier()  # or any other model
-model.fit(X_train, y_train)
-
-# Save the model
-with open('wine_quality_model.pkl', 'wb') as f:
-    pickle.dump(model, f)
-```
-```
-import streamlit as st
-import pandas as pd
-import pickle
-
-# Load the pre-trained model
-model_path = 'wine_quality_model.pkl'  # Update this path to your model file
-with open(model_path, 'rb') as f:
-    model = pickle.load(f)
-
-# Define the feature names used during training (without 'quality')
-feature_names = [
-    "fixed acidity", "volatile acidity", "citric acid", "residual sugar",
-    "chlorides", "free sulfur dioxide", "total sulfur dioxide", "density",
-    "pH", "sulphates", "alcohol"
-]
-
-# Streamlit app title
-st.title("Wine Quality Predictor")
-
-# Create input fields for each parameter
-fixed_acidity = st.number_input("Fixed acidity", min_value=0.0)
-volatile_acidity = st.number_input("Volatile acidity", min_value=0.0)
-citric_acid = st.number_input("Citric acid", min_value=0.0)
-residual_sugar = st.number_input("Residual sugar", min_value=0.0)
-chlorides = st.number_input("Chlorides", min_value=0.0)
-free_sulfur_dioxide = st.number_input("Free sulfur dioxide", min_value=0.0)
-total_sulfur_dioxide = st.number_input("Total sulfur dioxide", min_value=0.0)
-density = st.number_input("Density", min_value=0.0)
-pH = st.number_input("pH", min_value=0.0)
-sulphates = st.number_input("Sulphates", min_value=0.0)
-alcohol = st.number_input("Alcohol", min_value=0.0)
-
-# Create a button to make the prediction
-if st.button("Predict Wine Quality"):
-    # Prepare input data for prediction as a DataFrame with correct feature names
-    user_data = pd.DataFrame([[fixed_acidity, volatile_acidity, citric_acid, residual_sugar, chlorides,
-                                free_sulfur_dioxide, total_sulfur_dioxide, density, pH, sulphates, alcohol]],
-                              columns=feature_names)
-
-    # Make prediction
+for i, file in enumerate(all_files):
     try:
-        predicted_quality = model.predict(user_data)
+        df = pd.read_csv(file, header=None)
+        df.columns = ['time', 'x', 'y', 'z']
+        df = df[['x', 'y', 'z']].astype('float32')
+        if len(df) < window_size:
+            continue
+        for j in range(0, len(df) - window_size, stride):
+            segment = df.iloc[j:j + window_size].values
+            data.append(segment)
+            labels.append(i)
+    except Exception as e:
+        print(f"Error with {file}: {e}")
 
-        # Display the result
-        st.success(f"Predicted wine quality: {predicted_quality[0]}")
-    except ValueError as e:
-        st.error(f"Error in prediction: {str(e)}")
+X = np.array(data)
+y = np.array(labels)
+
+# STEP 3: Encode Labels and Split Dataset
+from sklearn.model_selection import train_test_split
+from tensorflow.keras.utils import to_categorical
+
+y_cat = to_categorical(y)
+X_train, X_test, y_train, y_test = train_test_split(X, y_cat, test_size=0.2, random_state=42)
+
+# STEP 4: Build 1D ResNet Model
+from tensorflow.keras.models import Model
+from tensorflow.keras.layers import Input, Conv1D, BatchNormalization, ReLU, Add, GlobalAveragePooling1D, Dense
+
+def residual_block(x, filters, kernel_size):
+    shortcut = x
+    x = Conv1D(filters, kernel_size, padding='same')(x)
+    x = BatchNormalization()(x)
+    x = ReLU()(x)
+    x = Conv1D(filters, kernel_size, padding='same')(x)
+    x = BatchNormalization()(x)
+    x = Add()([shortcut, x])
+    x = ReLU()(x)
+    return x
+
+def build_resnet(input_shape, num_classes):
+    inputs = Input(shape=input_shape)
+    x = Conv1D(64, 8, padding='same')(inputs)
+    x = BatchNormalization()(x)
+    x = ReLU()(x)
+    x = residual_block(x, 64, 5)
+    x = residual_block(x, 64, 5)
+    x = residual_block(x, 64, 5)
+    x = GlobalAveragePooling1D()(x)
+    outputs = Dense(num_classes, activation='softmax')(x)
+    return Model(inputs, outputs)
+
+model = build_resnet(input_shape=(X.shape[1], X.shape[2]), num_classes=y_cat.shape[1])
+model.compile(optimizer='adam', loss='categorical_crossentropy', metrics=['accuracy'])
+model.summary()
+
+# STEP 5: Train the Model
+history = model.fit(X_train, y_train, epochs=20, batch_size=64, validation_split=0.2)
+
+# STEP 6: Evaluate and Predict
+loss, accuracy = model.evaluate(X_test, y_test)
+print(f"Test Accuracy: {accuracy * 100:.2f}%")
+
+sample = X_test[0].reshape(1, X.shape[1], X.shape[2])
+prediction = model.predict(sample)
+predicted_class = np.argmax(prediction)
+true_class = np.argmax(y_test[0])
+print(f"Predicted Participant ID: {predicted_class}, True ID: {true_class}")
 ```
+
 ### Output:
-
-
-
-![Screenshot 2024-11-07 230858](https://github.com/user-attachments/assets/2ebd3a29-77ee-4250-84eb-f02b4f7da278)
-
-
+![Screenshot 2025-05-19 085825](https://github.com/user-attachments/assets/d6f52612-63a1-4f60-b184-29d125ccb411)
 
 
 ### Result:
